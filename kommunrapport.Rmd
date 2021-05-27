@@ -1,0 +1,97 @@
+---
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    collapsed: false
+    theme: cerulean
+date: "`r Sys.Date()`"
+params:
+   My_City:
+title: "Läget i `r params$My_City`" 
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+options(scipen=999, digits=1)
+
+```
+
+```{r, echo = FALSE}
+library("pxweb")
+library(tidyverse)
+```
+
+# Arbetsmarknad och näringsliv i `r params$My_City`
+
+## Sysselsättningsgrad
+
+```{r, echo = FALSE}
+## Statistik förvärvsarbetande efter sysselsättningsgrad, koderna hämtas genom att köra pxweb_interactive() och följa instruktionerna. Svara yes på allt förutom json-format.
+
+data <- pxweb_query_list <- 
+  list("Region"=c("1315","1380","1381","1382","1383","1384","1401","1402","1407","1415","1419","1421","1427","1430","1435","1438","1439","1440","1441","1442","1443","1444","1445","1446","1447","1452","1460","1461","1462","1463","1465","1466","1470","1471","1472","1473","1480","1481","1482","1484","1485","1486","1487","1488","1489","1490","1491"),
+       "Kon"=c("1+2"),
+       "UtbNiv"=c("000","F","3","EU"),
+       "BakgrVar"=c("tot20-64"),
+       "ContentsCode"=c("000001T8"),
+       "Tid"=c("2000","2001","2002","2003","2004","2005","2006","2007","2008","2009","2010","2011","2012","2013","2014","2015","2016","2017","2018","2019"))
+
+# Download data 
+data <- 
+  pxweb_get(url = "http://api.scb.se/OV0104/v1/doris/sv/ssd/AA/AA0003/AA0003B/IntGr1KomKonUtb",
+            query = pxweb_query_list)
+
+# Convert to data.frame 
+data <- as.data.frame(data, column.name.type = "text", variable.value.type = "text")
+
+## Filtrering utifrån parameter  och byte av variabelnamn
+
+data1 <- data %>%
+  filter(region == params$My_City)
+
+data1 <- data1 %>% 
+  rename(
+    Värde = "Andel förvärvsarbetande, procent",
+  )
+
+## Skapa titel till diagram, se labs title nedanför
+kom_namn <- data1$region[1.2]
+kom_namn <- paste("Sysselsättningsgrad i", kom_namn, "2000-2019")
+
+## Skapa värde för förändring senaste året. Koden innebär att man subratherar det senaste värdet i tabellen med det näst senaste
+utvsenaste <- head(tail(data1$Värde, n=1), n=1)-head(tail(data1$Värde, n=2), n=1)
+
+```
+
+I `r params$My_City` är `r last(data1$Värde)` procent av befolkningen i arbetsför ålder i sysselsättning. Det senaste året `r ifelse((utvsenaste) < 0, "minskade", "ökade")` sysselsättningsgraden med `r utvsenaste` procentenheter. 
+
+```{r, echo = FALSE}
+
+# Diagram 1: Här skapar vi diagrammet utifrån den data vi skapade i första R-boxen.
+
+##Bestäm ordning på utbnivå
+data1$utbildningsnivå = factor(data1$utbildningsnivå, levels=c('samtliga utbildningsnivåer','utbildningsnivå: förgymnasial utbildning', 'utbildningsnivå: gymnasial utbildning', 'utbildningsnivå: eftergymnasial utbildning'))
+
+## Linjediagram med punkter
+
+dia1 <- ggplot(data1, aes(x=år, y= Värde, group = 1)) +
+  geom_line(size = 1, colour = "deepskyblue3") +
+  geom_point(size = 1.5, colour = "deepskyblue3")+
+  theme_igray(base_size= 11) +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1)) +
+  theme(legend.position="none")
+
+## Dynamisk titel + övriga titlar
+
+dia1 <- dia1 + labs(title = paste0(kom_namn, "\n"), subtitle = "Andel av nattbefolkningen (20-64 år) som är i sysselsättning", caption = "Källa: Statistiska centralbyrån", colour = "") +
+  xlab("År") + 
+  ylab("Sysselsättningsgrad i %") +
+  facet_wrap(~utbildningsnivå, ncol = 2)
+
+dia1
+```
+
